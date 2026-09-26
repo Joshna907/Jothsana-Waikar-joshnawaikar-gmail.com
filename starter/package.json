@@ -16,6 +16,7 @@
     "fingerprint": "node scripts/personalise.js"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "better-sqlite3": "^11.10.0"
   },
   "devDependencies": {

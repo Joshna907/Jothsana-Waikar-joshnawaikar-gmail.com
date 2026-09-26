@@ -98,6 +98,20 @@ an owner may demote another owner only after the last-owner check succeeds. Admi
 other equal-rank modifications remain forbidden. I chose the executable public contract for this
 case because it is more specific, while keeping the broader rank rule everywhere else.
 
+### The console renders server decisions rather than inferring them from roles
+
+**What I chose:** Navigation and device actions are rendered from the `permissions` objects in
+`/auth/me` and `/devices`; the client contains no role-to-permission map.
+**Why:** The browser suite intercepts the device response, changes `device:control` to deny, and
+expects the button to disappear after the Devices view remounts. A polished role-based UI can
+look correct for the seed data while still fail the one-device Globex grant and a grading fixture
+with an undocumented role.
+**What I rejected:** Building a convenient client matrix such as `operator -> control`. It would
+not know about a new database role, a time-bounded grant, or an explicit deny, and would create a
+second authorization implementation that can drift from the server.
+**What would change my mind:** A versioned, server-provided capability catalogue designed for
+offline use. It would still be data from the server, not a copied role matrix.
+
 ## Deliberately not built
 
 What you chose not to build, and the reason. A scope cut with a stated reason is a senior

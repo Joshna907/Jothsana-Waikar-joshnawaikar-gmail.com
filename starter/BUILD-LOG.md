@@ -182,6 +182,33 @@ The complete backend contract finished at 66/66, alongside JWT 43/43, permission
 
 _Where did the server's answer and your instinct disagree about what should be on screen?_
 
+### 2026-09-26 · The interface is a projection, not a second policy engine
+
+I started by reading the UI inventory alongside the browser tests rather than making a generic
+admin dashboard. The crucial constraint is that a permission-controlled element is either
+present with `data-state="unlocked"` or absent. In particular, the same screen must show Dana a
+Control action on one Globex device but not the other; that ruled out a role-based navigation
+matrix and also ruled out disabled controls.
+
+The console now keeps the access token only in module memory, restores it from the refresh cookie
+on reload, and changes organization only by asking `/auth/token` for a new org-scoped token. Each
+view fetches only its active organization. I used a dark, compact operations layout with a single
+cobalt accent, but made org themes change the actual shell background so the organization change
+is visible as well as structural. The first build exposed an incorrect icon export from the icon
+package; replacing it with the package's `ActivityIcon` export made the production build pass.
+
+The first browser run exposed an assumption I had made while testing manually: I had put the
+organization choices behind a dropdown, but the inventory says those choices are always present
+and the tests interact with them directly. I changed the switcher into a permanent compact list.
+That is clearer for an operations console anyway, because the current scope is never hidden.
+
+The same run found a race after invite acceptance. The accept endpoint issues a refresh cookie,
+so changing the route to `/` immediately restored a session before the required sign-in screen
+could render. I now deliberately skip that one automatic refresh transition. I also removed the
+last frontend fixture assumption: role choices come from the database catalogue returned by the
+auth API rather than a copied list of role names. The production build and all 25 public browser
+cases now pass, alongside the four backend suites (43 + 35 + 66 + 18).
+
 ## Phase 8 — hardening
 
 _What did you measure, what did you fix, and what did you deliberately leave alone? Anything you
