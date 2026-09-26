@@ -17,7 +17,10 @@ import { send, sendError, readJson, notFound } from './http.js';
 import { authenticate } from './context.js';
 import { registerRoutes } from './routes/index.js';
 
-const DEV = process.env.NODE_ENV !== 'production';
+// The CLI flag keeps `npm start` portable: `NODE_ENV=production ...` is not
+// valid in Windows PowerShell/cmd, while Render and local machines can both
+// pass the same argument to Node.
+const DEV = !process.argv.includes('--production') && process.env.NODE_ENV !== 'production';
 const PORT = Number(process.env.PORT ?? 8080);
 const SECRET = process.env.JWT_SECRET ?? 'dev-secret-change-me';
 const DIST = fileURLToPath(new URL('../dist/', import.meta.url));

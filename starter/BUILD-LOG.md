@@ -242,7 +242,28 @@ failure distinguish an absent permission from authority held at the wrong scope.
 suite covers suspended tokens, scope laundering, refresh-family logout, and offboard/rehire grant
 cleanup.
 
+## Phase 9 — submission readiness
+
+### 2026-09-26 · The documented commands should work on the machine I used
+
+The final clean-checkout pass brought me back to the same Windows boundary I hit during setup.
+Although the loader itself had become portable, `npm run db:reset` still began with Unix `rm`,
+and `npm start` used the Unix-only `NODE_ENV=production command` form. That meant two commands in
+the README were not actually portable to the environment where I built the application.
+
+The loader already deletes `app.db` and its WAL/SHM files before recreating them, so I removed the
+duplicate shell deletion and made `db:reset` call the loader directly. For production startup I
+use an explicit `--production` argument that the server recognizes, while retaining `NODE_ENV`
+support for hosts that set it. I then re-ran the reset, production build, and production boot path
+instead of treating a successful development run as proof that the submitted command works.
+
 ## Open threads
 
 _Things you know are wrong, unfinished, or that you would do differently with another day. Listing
 these honestly is worth more than pretending they do not exist — we will find them anyway._
+
+- The repository packaging instructions conflict. The email says to fork the top-level repository,
+  but its organizer README says `q1-starter/`, `tools/`, and the grading rubric must not ship. I have
+  not rewritten history or deleted those directories because doing either would conflict with the
+  instruction to preserve the fork's commit history. My submitted start command explicitly enters
+  `starter/`, which is the generated candidate hand-out I changed.
