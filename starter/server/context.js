@@ -16,14 +16,39 @@
 // authenticate(db, secret) returns (req, params) => caller, where caller carries at
 // least { userId, orgId, role, membership, claims }.
 
-const todo = () =>
-  Object.assign(
-    new Error('TODO: server/context.js — authenticate() is yours to write (BRIEF.md §3).'),
-    { code: 'NOT_IMPLEMENTED' }
-  );
+import { assertFresh, verifyAccessToken } from './auth.js';
+import { notFound, unauthenticated } from './http.js';
 
 export function authenticate(db, secret) {
   return function buildContext(req, params) {
-    throw todo();
+    const authorization = req.headers.authorization;
+    const match = typeof authorization === 'string' && /^Bearer\s+([^\s]+)$/i.exec(authorization.trim());
+    if (!match) throw unauthenticated('missing bearer token');
+
+    const claims = verifyAccessToken(match[1], secret);
+
+    // The token chooses the organization. Do this before any route can query a
+    // resource in another organization, so a cross-org request is invisible.
+    if (params.org !== undefined && params.org !== claims.org) throw notFound();
+
+    const membership = db.prepare(
+      `SELECT id, org_id, user_id, role, status, perm_version
+         FROM memberships
+        WHERE org_id = ? AND user_id = ?`
+    ).get(claims.org, claims.sub);
+
+    if (!membership || !['active', 'suspended'].includes(membership.status)) {
+      throw unauthenticated('not an active member of this organization');
+    }
+
+    assertFresh(claims, membership);
+
+    return {
+      userId: membership.user_id,
+      orgId: membership.org_id,
+      role: membership.role,
+      membership,
+      claims,
+    };
   };
 }
