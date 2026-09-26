@@ -114,19 +114,69 @@ growing with the number of permissions in a grant.
 _Anything you had to work out that no document states. Invite lifecycle states are a common
 source of this._
 
+### 2026-09-26 · Transactions around identity changes
+
+I kept organization creation, membership changes, and invite acceptance transactional with their
+success audit row. Invite acceptance has to handle both a new identity and an existing platform
+user without duplicating either one, while an accepted/revoked/expired token must stay dead. The
+public flow now creates a hashed single-use invite, exposes only the four preview fields, accepts
+it once, and lets the new user authenticate with their chosen password.
+
+One contract conflict affected the role-change route: the prose says equal-ranked members cannot
+modify each other, while `check-api.js` expects one owner to demote another non-last owner. I used
+a narrow owner-to-owner demotion exception, still guarded by `LAST_OWNER`; equal-rank changes in
+the other cases remain forbidden. I recorded the conflict in `DECISIONS.md` rather than hiding it.
+
 ## Phase 4 — devices and grants
 
 _What happens at the boundary where two grants disagree, or where a grant's scope and the
 question's scope differ? Say what you predicted and what you got._
+
+### 2026-09-26 · Navigation scope is not grant-authority scope
+
+My first `assertMayGrant` reused the org-level resolved set. That set is intentionally a union for
+navigation—allowed on any device means the action can appear somewhere—but it was the wrong
+answer for creating an org-wide grant. Dana's one-device control grant in Globex would have let
+her grant control across the whole org. I changed org-wide grant validation to ignore
+device-scoped authority and added a smoke check: org-wide returned `403`, the granted device
+returned allow, and the other device returned `403`.
+
+Device listing resolves all rows from one loaded permission model and removes rows where
+`device:view` is denied. Transfers require provisioning authority in both organizations, reject a
+same-org transfer, end live sessions, and revoke the old org's device-scoped grants.
 
 ## Phase 5 — sessions
 
 _Two permissions, one device. What did you have to resolve, and in what order, to keep the two
 failure reasons distinguishable?_
 
+### 2026-09-26 · Explicit stop and lifecycle cascade are different operations
+
+Session start resolves one snapshot, checks `session:start` first, then the mode-specific device
+permission so the two denial reasons stay distinct. The partial unique index remains the arbiter
+for exclusive control/terminal sessions; the route translates its constraint failure to
+`DEVICE_BUSY` instead of doing a racy check before insert.
+
+During review I noticed I had initially called the broad lifecycle cascade helper from the
+explicit stop route. That could end sibling sessions belonging to the same user and device. I
+removed it there and made explicit stop update exactly one session; the broad helper is now used
+only for suspension, membership removal, and device transfer. Permission and role changes do not
+call it, which preserves grandfathering.
+
 ## Phase 6 — audit
 
 _What did you decide counts as an auditable event, and what pushed you to that line?_
+
+### 2026-09-26 · Denials are events too
+
+Successful mutations write one audit row inside the same transaction as the state change. A
+shared permission wrapper records `403` attempts before rethrowing, including the machine-readable
+reason and request id. I kept authentication failures and invisible cross-org `404`s out of that
+wrapper because writing them against a guessed organization would itself cross the isolation
+boundary. Audit pagination rejects invalid limits rather than silently clamping them.
+
+The complete backend contract finished at 66/66, alongside JWT 43/43, permission resolution
+35/35, and personalization 18/18.
 
 ## Phase 7 — the console
 

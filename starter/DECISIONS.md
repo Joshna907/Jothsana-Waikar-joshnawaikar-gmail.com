@@ -23,6 +23,20 @@ Rules, from `DISCOVERY-BRIEF.md`:
 
 ---
 
+### Removing a membership also revokes its active grants
+
+**What I chose:** Offboarding marks the membership removed, ends its sessions, and revokes its
+active grants in the same transaction.
+**Why:** A removed membership can later be reactivated through the invite path. Leaving the old
+grant rows active would silently restore exceptional access on rehire, including grants that the
+new inviter may not know existed. Removal is a permanent tenancy event, unlike suspension.
+**What I rejected:** Keeping grants dormant only because resolution ignores a removed membership.
+That makes their safety depend on the membership never becoming active again.
+**What would change my mind:** An explicit product requirement that rehire restores the person's
+previous exceptional access, together with UI that shows and confirms those grants during rehire.
+
+---
+
 ### Stub — the shape of a weak "Why"
 
 **What I chose:** the obvious thing.
@@ -58,6 +72,31 @@ one you found. For each: quote both statements, say which you built against, and
 Building against the written rule and arguing in writing is a **full-marks** answer. Silently
 working around it, or quietly picking one and saying nothing, scores zero on the section — we
 cannot tell the difference between a decision and an oversight.
+
+### The grading weights are described in two different ways
+
+`DISCOVERY-BRIEF.md` assigns 50% to code, 30% to `BUILD-LOG.md` plus `DECISIONS.md`, and 20% to
+the walkthrough. `BRIEF.md` instead lists 30% hidden API, 20% hidden UI, 25% code quality, and
+25% walkthrough, without a separate write-up percentage. I am treating both as signals rather
+than choosing one: functional behavior, code quality, the contemporaneous write-up, and the live
+explanation all need to stand on their own. I would ask the organizers which table controls any
+formal score calculation, but the disagreement does not change an implementation decision.
+
+### The console inventory says seven cards but defines six
+
+`UI-INVENTORY.md` says “Seven cards,” then names Devices, People, Grants, Sessions, Audit, and
+Admin. The table contains six entries, and the public owner test also says “all six cards.” I am
+building the six explicitly named/tested cards because those are the concrete interface contract;
+I am not inventing an unnamed seventh card.
+
+### Equal-rank modification conflicts with the owner-demotion test
+
+`PERMISSIONS.md` says a caller may modify only a strictly lower role and that equal-role changes
+are forbidden. The public API suite nevertheless expects Dana (owner) to demote another active
+owner to viewer when Acme has more than one owner. I implemented that exact narrow exception:
+an owner may demote another owner only after the last-owner check succeeds. Admin-to-admin and
+other equal-rank modifications remain forbidden. I chose the executable public contract for this
+case because it is more specific, while keeping the broader rank rule everywhere else.
 
 ## Deliberately not built
 
