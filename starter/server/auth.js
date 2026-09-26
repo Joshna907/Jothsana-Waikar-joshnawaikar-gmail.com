@@ -71,12 +71,53 @@ export function issueAccessToken({ userId, orgId, role, permVersion }, secret) {
 // `node scripts/check-jwt.js` is the public test suite for this function.
 // ---------------------------------------------------------------------------
 export function verifyAccessToken(token, secret) {
-  // YOURS TO WRITE. Every failure mode listed above must be a 401 UNAUTHENTICATED.
-  // `node scripts/check-jwt.js` is the public suite for this function.
-  throw Object.assign(
-    new Error('TODO: server/auth.js — verifyAccessToken() is yours to write (AUTH-DATA-MODEL.md §10).'),
-    { code: 'NOT_IMPLEMENTED' }
-  );
+  const reject = () => {
+    throw unauthenticated('invalid access token');
+  };
+
+  // Buffer's base64url decoder is deliberately permissive, so validate and
+  // round-trip each segment before trusting its bytes.
+  const decodeSegment = (segment) => {
+    if (typeof segment !== 'string' || !/^[A-Za-z0-9_-]+$/.test(segment)) reject();
+    const decoded = unb64(segment);
+    if (b64(decoded) !== segment) reject();
+    return decoded;
+  };
+
+  try {
+    if (typeof token !== 'string') reject();
+
+    const parts = token.split('.');
+    if (parts.length !== 3) reject();
+    const [headerPart, payloadPart, signaturePart] = parts;
+
+    const headerBytes = decodeSegment(headerPart);
+    const payloadBytes = decodeSegment(payloadPart);
+    const signature = decodeSegment(signaturePart);
+
+    const header = JSON.parse(headerBytes.toString('utf8'));
+    if (header === null || typeof header !== 'object' || Array.isArray(header)) reject();
+    if (header.alg !== ALG || header.typ !== 'JWT') reject();
+
+    const expected = createHmac('sha256', secret)
+      .update(`${headerPart}.${payloadPart}`)
+      .digest();
+    if (signature.length !== expected.length || !timingSafeEqual(signature, expected)) reject();
+
+    const claims = JSON.parse(payloadBytes.toString('utf8'));
+    if (claims === null || typeof claims !== 'object' || Array.isArray(claims)) reject();
+
+    const now = Math.floor(Date.now() / 1000);
+    if (typeof claims.exp !== 'number' || !Number.isFinite(claims.exp) || claims.exp <= now) reject();
+    if (claims.iss !== ISS || claims.aud !== AUD) reject();
+    if (typeof claims.jti !== 'string' || claims.jti.trim().length === 0) reject();
+
+    return claims;
+  } catch {
+    // JSON parsing, decoding and crypto errors are all authentication failures;
+    // none of their implementation details should escape to the caller.
+    reject();
+  }
 }
 
 
