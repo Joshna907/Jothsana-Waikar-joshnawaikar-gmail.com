@@ -214,6 +214,18 @@ cases now pass, alongside the four backend suites (43 + 35 + 66 + 18).
 _What did you measure, what did you fix, and what did you deliberately leave alone? Anything you
 chose not to build belongs here with its reason._
 
+### 2026-09-26 · A demo needs a repeatable boot path
+
+I added a Render Blueprint at the repository root rather than relying on dashboard settings that
+cannot be reviewed with the submission. It treats `starter/` as the service root, builds the SPA,
+seeds the fixture at startup, and starts the existing one-process server. The deployment has a
+generated JWT secret and uses Render's port rather than a hardcoded one.
+
+I am deliberately treating this as a demo, not production storage. SQLite is appropriate for the
+take-home and the published fixture, but Render's free filesystem is ephemeral, so a restart can
+reset the demo data. Moving it to a persistent disk would require a paid service and is outside
+the evaluation contract.
+
 ## Open threads
 
 _Things you know are wrong, unfinished, or that you would do differently with another day. Listing

@@ -1,0 +1,17 @@
+# Demo deployment for the RemoteOps take-home.
+# The app is in starter/, while this file stays at the Git repository root so
+# Render can import it as a Blueprint.
+services:
+  - type: web
+    runtime: node
+    name: remoteops-jothsana-console
+    plan: free
+    rootDir: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm run db:load && npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
