@@ -7,11 +7,9 @@ services:
     name: remoteops-jothsana-console
     plan: free
     rootDir: starter
-    buildCommand: npm ci && npm run build
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm run db:load && npm start
     healthCheckPath: /
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: JWT_SECRET
         generateValue: true
