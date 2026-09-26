@@ -111,6 +111,11 @@ export function verifyAccessToken(token, secret) {
     if (typeof claims.exp !== 'number' || !Number.isFinite(claims.exp) || claims.exp <= now) reject();
     if (claims.iss !== ISS || claims.aud !== AUD) reject();
     if (typeof claims.jti !== 'string' || claims.jti.trim().length === 0) reject();
+    for (const claim of ['sub', 'org', 'role']) {
+      if (typeof claims[claim] !== 'string' || claims[claim].trim().length === 0) reject();
+    }
+    if (!Number.isInteger(claims.pv) || claims.pv < 0) reject();
+    if (typeof claims.iat !== 'number' || !Number.isFinite(claims.iat)) reject();
 
     return claims;
   } catch {

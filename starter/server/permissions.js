@@ -66,7 +66,12 @@ export function assertMayGrant(db, ctx, patterns, deviceId = null) {
   }
 
   const catalogue = db.prepare('SELECT key FROM permissions ORDER BY key').all().map((row) => row.key);
-  const decisions = resolve(db, { userId: ctx.userId, orgId: ctx.orgId, deviceId }).permissions;
+  // Navigation uses the org-level UNION (allowed somewhere). Granting at org scope
+  // is stricter: device-scoped authority cannot be laundered into an org-wide grant.
+  // Resolve with a null device directly so only the role baseline and org-wide grants apply.
+  const decisions = deviceId === null
+    ? resolvedForDevice(loadModel(db, { userId: ctx.userId, orgId: ctx.orgId, now: new Date() }), null).permissions
+    : resolve(db, { userId: ctx.userId, orgId: ctx.orgId, deviceId }).permissions;
   for (const pattern of patterns) {
     const covered = catalogue.filter((permission) => patternMatches(pattern, permission));
     if (covered.length === 0) throw badRequest(`unknown permission pattern: ${pattern}`);

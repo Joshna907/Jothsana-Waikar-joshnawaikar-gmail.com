@@ -32,9 +32,10 @@ export function authenticate(db, secret) {
     if (params.org !== undefined && params.org !== claims.org) throw notFound();
 
     const membership = db.prepare(
-      `SELECT id, org_id, user_id, role, status, perm_version
-         FROM memberships
-        WHERE org_id = ? AND user_id = ?`
+      `SELECT m.id, m.org_id, m.user_id, m.role, m.status, m.perm_version
+         FROM memberships m
+         JOIN organizations o ON o.id = m.org_id
+        WHERE m.org_id = ? AND m.user_id = ? AND o.deleted_at IS NULL`
     ).get(claims.org, claims.sub);
 
     if (!membership || !['active', 'suspended'].includes(membership.status)) {
