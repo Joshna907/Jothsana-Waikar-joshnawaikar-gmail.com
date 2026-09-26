@@ -11,18 +11,6 @@ Rules, from `DISCOVERY-BRIEF.md`:
 
 ---
 
-### <the decision, as a claim — not "permissions", but "the org-level view counts device-scoped grants">
-
-**What I chose:**
-**Why:** _(evidence: test, log line, commit)_
-**What I rejected:** _(the plausible alternative, and the specific reason it fails)_
-**What would change my mind:**
-
-<!-- Copy the block above per decision. The two stubs below show the required shape and contain no
-     engineering content — replace or delete them. -->
-
----
-
 ### Removing a membership also revokes its active grants
 
 **What I chose:** Offboarding marks the membership removed, ends its sessions, and revokes its
@@ -37,30 +25,72 @@ previous exceptional access, together with UI that shows and confirms those gran
 
 ---
 
-### Stub — the shape of a weak "Why"
+### Grant authority is checked at the destination scope
 
-**What I chose:** the obvious thing.
-**Why:** it is what the brief says to do.
-**What I rejected:** nothing, the alternative seemed worse.
-**What would change my mind:** I do not know.
-
-_Reads as a memory of the document, not a model of the system. Scores nothing._
+**What I chose:** Creating an org-wide grant checks only authority held org-wide; a permission
+held on one device cannot be promoted into organization-wide authority.
+**Why:** Dana's Globex fixture is the discriminating case: she can control one device, while the
+other remains denied. The Phase 4 smoke check and `npm run hardening` both prove that attempting
+to grant `device:control` without naming the device fails with `scope_mismatch`.
+**What I rejected:** Reusing the org-level navigation union for grant creation. That union answers
+“does this appear anywhere?” and would turn one-device authority into control of every device.
+**What would change my mind:** A separate product rule allowing delegation beyond the caller's
+own scope, with an approval workflow outside this permission model.
 
 ---
 
-### Stub — the shape of a strong "Why"
+### Exclusive sessions are arbitrated by SQLite
 
-**What I chose:** X.
-**Why:** I implemented Y first, because Y is the intuitive precedence rule. `node scripts/check-
-permissions.js` reported `<the actual reason string it reported>` on the case where the two grants
-disagree. That is only reachable if the two are evaluated in a different order than Y assumes.
-Moved to X in `<commit>` and the case passed. Logged in `BUILD-LOG.md` under Phase 2.
-**What I rejected:** Y, and also "resolve the narrower one last" — both fail the same case for the
-same reason.
-**What would change my mind:** a case where a narrower grant is expected to survive a broader
-refusal. I could not construct one, which is itself evidence for X.
+**What I chose:** The route attempts the insert and translates the partial unique-index failure
+into `409 DEVICE_BUSY`.
+**Why:** `one_exclusive_session_per_device` is the only place that can decide correctly when two
+control requests arrive together. The API suite proves a second exclusive session is rejected
+while a concurrent view session remains allowed.
+**What I rejected:** A `SELECT` followed by `INSERT`. Two callers can both observe an empty device
+before either insert commits, making the check correct only when requests happen serially.
+**What would change my mind:** Moving session ownership to a datastore with an equivalent atomic
+compare-and-set primitive; the invariant would still live in storage.
 
-_Shows what you believed, what disproved it, and what you did next._
+---
+
+### Successful mutations and their audit rows share a transaction
+
+**What I chose:** Success events are written inside the mutation transaction; the shared
+permission boundary writes denied attempts once and then rethrows the original refusal.
+**Why:** The audit suite finds both allow and deny events with their request/reason metadata. More
+importantly, a failed audit insert rolls back the state change instead of creating unaudited
+authority.
+**What I rejected:** Logging after sending the response, or logging both in the permission wrapper
+and the route. The first can lose events and the second produces two rows for one action.
+**What would change my mind:** An external append-only event store with an outbox transaction that
+provides the same atomicity guarantee.
+
+---
+
+### Suspended credentials remain identifiable but powerless
+
+**What I chose:** Authentication recognizes a signed token for a suspended membership, then every
+protected route stops it at `requireActive` with `403` and reason `suspended`.
+**Why:** Suspension increments `perm_version`, so applying the normal freshness check first turned
+the same request into `401 TOKEN_STALE`. `npm run hardening` now covers the ordering explicitly.
+**What I rejected:** Treating suspension as removal. It erases the distinction the API and console
+need between an invalid identity and a reversible account-integrity action.
+**What would change my mind:** A contract that deliberately conceals suspension state from the
+account holder and specifies `401` for that case.
+
+---
+
+### Sign-out revokes the refresh family without widening cookie scope
+
+**What I chose:** Sign-out calls a public endpoint below `/auth/refresh`, revokes the presented
+token family, expires the HttpOnly cookie, and then clears the in-memory access token.
+**Why:** Clearing React state alone appeared to sign out, but reloading immediately restored the
+session from the still-valid cookie. The hardening check proves that the old refresh token returns
+`401` after logout.
+**What I rejected:** Moving the cookie to `/` just to make a conventional `/logout` route easier.
+That would send the credential to every application request instead of only the auth boundary.
+**What would change my mind:** A separate authentication origin where the cookie is never sent to
+the application API in the first place.
 
 ---
 
@@ -116,3 +146,13 @@ offline use. It would still be data from the server, not a copied role matrix.
 
 What you chose not to build, and the reason. A scope cut with a stated reason is a senior
 judgement. An unmentioned gap is a gap.
+
+- The Render deployment does not provide durable production storage. It is a resettable demo of
+  the submitted SQLite fixture; a persistent disk is paid infrastructure and not part of the
+  take-home contract.
+- Remote session buttons create and govern session records, but they do not open a real remote
+  desktop, shell, or file-transfer channel. The brief explicitly treats sessions as records and
+  prohibits input injection, shell execution, and screen capture.
+- There is no client-side permission cache or offline mode. Decisions are time-sensitive and must
+  be resolved by the server on each request, so an offline capability layer would undermine the
+  model rather than improve it.

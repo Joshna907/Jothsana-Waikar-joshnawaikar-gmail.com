@@ -1,7 +1,5 @@
 // Append-only audit writes.
 //
-// YOURS TO WRITE. This file ships as a stub.
-//
 // audit_events has BEFORE UPDATE / BEFORE DELETE triggers, so this module only ever
 // INSERTs. Two things the spec is explicit about (BRIEF.md §4, PERMISSIONS.md §8):
 //

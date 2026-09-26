@@ -390,9 +390,17 @@ function App() {
     <Console
       session={session}
       setSession={setSession}
-      signOut={() => {
-        clearToken();
-        setSession(null);
+      signOut={async () => {
+        try {
+          await api("/v1/auth/refresh/logout", {
+            method: "POST",
+            auth: false,
+            body: {},
+          });
+        } finally {
+          clearToken();
+          setSession(null);
+        }
       }}
     />
   ) : (

@@ -1,7 +1,5 @@
 // The permission resolution engine. THE ONLY PLACE allow-vs-deny is decided.
 //
-// YOURS TO WRITE. This file ships as a stub.
-//
 // If you ever find yourself writing `if (role === 'admin')` outside this file — and
 // especially under web/ — that is the bug this module exists to prevent. The console
 // renders what this returns; it must never re-derive it.
@@ -72,13 +70,17 @@ export function assertMayGrant(db, ctx, patterns, deviceId = null) {
   const decisions = deviceId === null
     ? resolvedForDevice(loadModel(db, { userId: ctx.userId, orgId: ctx.orgId, now: new Date() }), null).permissions
     : resolve(db, { userId: ctx.userId, orgId: ctx.orgId, deviceId }).permissions;
+  const anywhere = resolve(db, { userId: ctx.userId, orgId: ctx.orgId }).permissions;
   for (const pattern of patterns) {
     const covered = catalogue.filter((permission) => patternMatches(pattern, permission));
     if (covered.length === 0) throw badRequest(`unknown permission pattern: ${pattern}`);
     for (const permission of covered) {
       const decision = decisions[permission];
       if (decision?.effect !== 'allow') {
-        throw forbidden('cannot grant a permission you do not hold', denialReason(decision));
+        const reason = decision?.reason === 'implicit' && anywhere[permission]?.effect === 'allow'
+          ? 'scope_mismatch'
+          : denialReason(decision);
+        throw forbidden('cannot grant a permission you do not hold at this scope', reason);
       }
     }
   }

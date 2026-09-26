@@ -1,8 +1,7 @@
 // JWT and password hashing, hand-rolled on node:crypto.
 //
 // Nothing here is hidden behind a library on purpose. Signing is done for you;
-// `verifyAccessToken` below is a stub you have to implement. The rules it must
-// enforce are in AUTH-DATA-MODEL.md §10 and restated in the TODO comment.
+// The rules enforced by `verifyAccessToken` are in AUTH-DATA-MODEL.md §10.
 //
 // The payload is base64, NOT encrypted. Never put a secret in it.
 
@@ -48,7 +47,7 @@ export function issueAccessToken({ userId, orgId, role, permVersion }, secret) {
 }
 
 // ---------------------------------------------------------------------------
-// TODO — yours to implement.
+// Verification boundary.
 //
 // Verify an access token and return its claims, or throw `unauthenticated(...)`.
 // The signing half above is done for you; the verifying half is the exercise.

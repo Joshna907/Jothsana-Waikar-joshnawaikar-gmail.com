@@ -226,6 +226,22 @@ take-home and the published fixture, but Render's free filesystem is ephemeral, 
 reset the demo data. Moving it to a persistent disk would require a paid service and is outside
 the evaluation contract.
 
+### 2026-09-26 · The public suites were green, but two boundaries were still wrong
+
+I expected the permission-version check to be harmless for suspended members because suspension
+already empties their resolved set. A focused check showed the opposite: suspension increments
+`perm_version`, so the old token stopped at `TOKEN_STALE` before the route could return the
+documented `403 suspended`. I now skip freshness only for a recognized suspended membership;
+removed memberships still fail authentication, and `requireActive` blocks every route.
+
+The second problem was in the browser rather than the resolver. “Sign out” cleared the access
+token in memory, but the refresh cookie survived, so a reload signed the same person straight back
+in. The new logout endpoint sits under the cookie's narrow `/auth/refresh` path, revokes the whole
+refresh family, and expires the cookie before the client drops local state. I also made the grant
+failure distinguish an absent permission from authority held at the wrong scope. The new focused
+suite covers suspended tokens, scope laundering, refresh-family logout, and offboard/rehire grant
+cleanup.
+
 ## Open threads
 
 _Things you know are wrong, unfinished, or that you would do differently with another day. Listing

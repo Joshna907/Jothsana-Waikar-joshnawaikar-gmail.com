@@ -1,8 +1,5 @@
 // Per-request context: turn a bearer token into an authenticated caller.
 //
-// YOURS TO WRITE. This file ships as a stub so the server boots and every
-// authenticated request fails loudly instead of appearing to work.
-//
 // What it has to do (BRIEF.md §3, PERMISSIONS.md §6):
 //   - read the bearer token, verify it with verifyAccessToken() from ./auth.js
 //   - look the membership up and refuse a token whose org or membership is gone
@@ -42,7 +39,11 @@ export function authenticate(db, secret) {
       throw unauthenticated('not an active member of this organization');
     }
 
-    assertFresh(claims, membership);
+    // Suspension is intentionally distinguishable from invalid credentials. It
+    // bumps perm_version, but suspended callers must still reach requireActive()
+    // and receive the documented 403/suspended response on every protected route.
+    // Removed memberships remain a 401 above.
+    if (membership.status === 'active') assertFresh(claims, membership);
 
     return {
       userId: membership.user_id,

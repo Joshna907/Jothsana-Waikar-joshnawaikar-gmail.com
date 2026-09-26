@@ -80,6 +80,25 @@ export function registerAuthRoutes(router, { db, secret }) {
     );
   });
 
+  // The refresh cookie is deliberately scoped to /v1/auth/refresh. Keeping the
+  // logout endpoint below that path lets the browser send and clear the HttpOnly
+  // credential without widening its exposure to unrelated API routes.
+  router.post("/v1/auth/refresh/logout", (ctx, _params, res) => {
+    const raw = cookieValue(ctx.req.headers.cookie, "remoteops_refresh");
+    if (raw) {
+      const stored = db
+        .prepare("SELECT family_id FROM refresh_tokens WHERE token_hash = ?")
+        .get(hashRefreshToken(raw));
+      if (stored) {
+        db.prepare(
+          "UPDATE refresh_tokens SET revoked_at = coalesce(revoked_at, ?) WHERE family_id = ?",
+        ).run(nowIso(), stored.family_id);
+      }
+    }
+    clearRefreshCookie(res);
+    send(res, 200, { signedOut: true });
+  });
+
   router.post("/v1/auth/token", (ctx, _params, res) => {
     requireActive(ctx);
     const orgId = requireText(ctx.body.orgId, "orgId");
@@ -190,6 +209,13 @@ function setRefreshCookie(res, raw) {
   res.setHeader(
     "set-cookie",
     `remoteops_refresh=${raw}; HttpOnly; SameSite=Strict; Secure; Path=/v1/auth/refresh; Max-Age=${REFRESH_TTL_SECONDS}`,
+  );
+}
+
+function clearRefreshCookie(res) {
+  res.setHeader(
+    "set-cookie",
+    "remoteops_refresh=; HttpOnly; SameSite=Strict; Secure; Path=/v1/auth/refresh; Max-Age=0",
   );
 }
 

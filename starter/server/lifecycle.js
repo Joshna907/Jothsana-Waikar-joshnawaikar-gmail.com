@@ -1,7 +1,5 @@
 // Shared domain rules: role ranks, last-owner protection, ending sessions.
 //
-// YOURS TO WRITE. This file ships as a stub.
-//
 // Put here the rules more than one route needs, so "what ends a session" has exactly
 // one implementation. Sources: PERMISSIONS.md §7.2 and D8.
 //
