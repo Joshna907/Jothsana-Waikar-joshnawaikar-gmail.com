@@ -29,10 +29,47 @@ Note: this is the failure mode where a passing test is worse than a failing one.
 _Installed, reset the database, read the documents, ran the suites against the untouched skeleton.
 What did the starting line actually look like, and which failure surprised you?_
 
+### 2026-09-26 · Setup was not as automatic as I expected
+
+I started with Node 24.19.0 because that was already installed and assumed `npm ci` would be the
+boring part. It was not: `better-sqlite3` had no prebuilt binary for that version, then `node-gyp`
+sent me towards the Visual Studio C++ build tools. The useful clue was actually the repo's
+`.nvmrc`, which says Node 22. After switching to Node 22.22.3, the same install completed in about
+14 seconds with 0 vulnerabilities.
+
+The next failure looked like I had typed a path twice: the loader tried to open
+`C:\C:\Users\dell\Desktop\rhinostream\starter\db\schema.sql`. The command was fine. The path came
+from `new URL(...).pathname`, whose result was being passed directly to the Windows filesystem.
+I changed that conversion to `fileURLToPath(new URL(...))`. After that, the load completed with
+3 organizations, 20 permissions, and the personalized `reviewer` / `device:reboot` data. That
+also made the warning about hardcoding the documented matrix concrete rather than theoretical.
+
+With setup working, the untouched JWT suite was 0/43. This was the expected failure: every case
+was reaching the deliberate `verifyAccessToken` stub.
+
 ## Phase 1 — token verification
 
 _What did you expect each failure mode to look like before you ran it? Which one behaved
 differently from your expectation, and what did that tell you?_
+
+### 2026-09-26 · The decoder was more forgiving than the verifier should be
+
+My first model was straightforward: split the token, decode the pieces, verify the signature,
+then validate the claims. One detail changed after checking Node directly. I expected
+`Buffer.from(value, 'base64url')` to reject punctuation, but
+`Buffer.from('!!!not-base64!!!', 'base64url')` silently produced seven bytes and re-encoded as
+`not-base6w`. Relying on the decoder alone would therefore accept malformed input farther into
+the verifier than intended.
+
+I added two checks for every token segment: an explicit base64url character check and a
+decode/re-encode check for canonical encoding. For signatures, I check the byte lengths before
+calling `timingSafeEqual`, because that function throws on unequal lengths. Finally, I collapse
+JSON, decoding, and crypto failures into the same `401 UNAUTHENTICATED` result so parser details
+cannot leak through the HTTP layer.
+
+Result: `node scripts/check-jwt.js` moved from 0/43 to 43/43. The verifier returns the original
+claims for a valid token and rejects malformed tokens, algorithm substitution, bad signatures,
+expired tokens, wrong issuer/audience, and missing JTIs through the same error type.
 
 ## Phase 2 — caller context and the resolution engine
 
