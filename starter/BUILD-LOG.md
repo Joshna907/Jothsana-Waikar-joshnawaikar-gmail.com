@@ -76,6 +76,39 @@ expired tokens, wrong issuer/audience, and missing JTIs through the same error t
 _This is where most people's first model is wrong. Write down the model you started with, the
 observation that broke it, and the model you moved to. Be specific about the observation._
 
+### 2026-09-26 · One resolver, with the database as its input
+
+I treated `resolve()` as the only place that can decide allow versus deny. It loads the permission
+catalogue, membership role, role baseline, and active grants from SQLite; no role names or
+permission list are encoded in the implementation. The public vectors confirmed the important
+precedence rule: an org-wide deny still wins when there is a device-scoped allow, so a narrower
+allow is not an exception mechanism.
+
+For an organization-level answer, I resolve each active device and take the union of the allowed
+results. That matches the navigation question: an action should be available at org level when it
+is possible on at least one device, while a device-row action still uses that row's exact result.
+The database-only overlay was the useful check here: `npm run personalisation` passed 18/18 for
+the undocumented `reviewer` role and `device:reboot` permission, including separate allow and
+explicit-deny decisions on two devices. `check-permissions.js` passed 35/35.
+
+The context step keeps organization scope structural. A valid Acme token produced an Acme caller,
+while that same token addressed to a Globex route produced `404 NOT_FOUND`; it did not get far
+enough to ask a permission question.
+
+#### Review pass
+
+My first completed version still had two avoidable gaps. First, the public JWT suite validates
+the envelope but does not try a correctly signed token with a missing `sub`, `org`, `role`, `pv`,
+or `iat`. Such a token could pass verification and send `undefined` into the membership query,
+turning malformed credentials into a 500. I added structural validation for the complete claim
+set; a missing-`sub` smoke test now returns `401 UNAUTHENTICATED`.
+
+Second, the first compound-session check called the full resolver once for `session:start` and
+again for the mode permission. The first grant-laundering check did the same for every expanded
+permission in a wildcard. I changed both to resolve one snapshot and inspect all required
+decisions from it. This keeps both answers on the same timestamp and prevents query work from
+growing with the number of permissions in a grant.
+
 ## Phase 3 — orgs, members, invites
 
 _Anything you had to work out that no document states. Invite lifecycle states are a common
